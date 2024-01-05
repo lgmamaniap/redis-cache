@@ -3,7 +3,9 @@ const axios = require('axios')
 const dotenv = require('dotenv')
 const responseTime = require('response-time')
 const redis = require('redis')
-const { promisify } = require('util')
+const Constants = require('./common/constants')
+
+const { ControllerName, RedisKeys } = Constants
 
 dotenv.config()
 
@@ -16,20 +18,34 @@ const client = redis.createClient({
 client.on('error', err => console.log('Redis Client Error', err))
 client.connect()
 
-
 const app = express()
 app.use(responseTime())
 
 // Controladores
-app.get('/character', async (req, res) => {
-  const reply = await client.get('characters')
+app.get(`/${ControllerName.CHARACTER}`, async (req, res) => {
+  const reply = await client.get(`${RedisKeys.CHARACTER}`)
   if (reply) {
     return res.json(JSON.parse(reply))
   }
 
   const response = await axios.get(`${process.env.API_URL}`)
 
-  await client.set('characters', JSON.stringify(response.data))
+  await client.set(`${RedisKeys.CHARACTER}`, JSON.stringify(response.data))
+
+  return res.json(response.data)
+})
+
+app.get(`/${ControllerName.CHARACTER}/:id`, async (req, res) => {
+  const { id } = req.params
+
+  const reply = await client.get(`${RedisKeys.CHARACTER}:${id}`)
+  if (reply) {
+    return res.json(JSON.parse(reply))
+  }
+
+  const response = await axios.get(`${process.env.API_URL}/${id}`)
+
+  await client.set(`${RedisKeys.CHARACTER}:${id}`, JSON.stringify(response.data))
 
   return res.json(response.data)
 })
